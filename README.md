@@ -16,21 +16,22 @@ Calcula métricas analíticas (ex. taxa de cruzamentos por zero, cenróide espec
    * [Argumentos de Linha de Comando](#argumentos-de-linha-de-comando)
    * [Exemplo](#exemplo)
 6. [Docker](#docker)
-7. [Dados de entrada](#dados-de-entrada)
-8. [Dados de saída](#dados-de-saída)
+7. [Notebook](#notebook)
+8. [Dados de entrada](#dados-de-entrada)
+9. [Dados de saída](#dados-de-saída)
 
    * [Espectrogramas](#espectrogramas)
    * [Métricas JSON/CSV](#métricas-jsoncsv)
    * [Gráficos](#gráficos)
    * [Ranque de plugins](#ranque-de-plugins)
-9. [Descrição de funções](#descrição-de-funções)
+10. [Descrição de funções](#descrição-de-funções)
 
    * [`analytical_metrics()`](#analytical_metrics)
    * [`comparative_metrics()`](#comparative_metrics)
    * [`plot_spectrograms()`](#plot_spectrograms)
    * [`calculate_metrics()`](#calculate_metrics)
    * [`evaluate_errors()`](#evaluate_errors)
-10. [Autores & Contato](#autores--contato)
+11. [Autores & Contato](#autores--contato)
 
 ---
 
@@ -313,6 +314,29 @@ Para executar via Docker, siga os passos abaixo:
    ```
 
 Após completo, todos os arquivos de saída JSON, CSV, e PNG estarão disponíveis no diretório de saída (`/path/to/local/data_out`).
+
+---
+
+## Notebook
+
+Para executar ambiente Python Notebook, utilize o arquivo `MOPAQDAPS.ipynb` (recomenda-se uso do Google Colab).
+
+Para isso, os dados de entrada deverão ser importados em uma pasta `dataset` contendo os diretórios `dataset/input` e `dataset/output` como instruído acima.
+
+Caso preferir o uso de outro ambiente além do Google Colab (recomendado), adeque os caminhos demonstrados abaixo para o seu uso:
+
+```python
+# ================================
+# Paths
+# ================================
+input_dir = "/content/dataset/input"
+output_dir = "/content/dataset/output"
+
+spectrograms_dir = "/content/dataset/spectrograms"
+analytical_dir = "/content/dataset/metrics/analytical"
+comparison_dir = "/content/dataset/metrics/comparison"
+results_dir = "/content/dataset/results"
+```
 
 ---
 
@@ -658,8 +682,4 @@ Retorna dois dicionários:
 * **João Pedro Torres** ([joao.silva@sga.pucminas.br](mailto:joao.silva@sga.pucminas.br))
 * **Gabriel Barbosa da Fonseca** ([gabriel.fonseca.771248@sga.pucminas.br](mailto:gabriel.fonseca.771248@sga.pucminas.br))
 
-TCC de Graduação pelo Instituto de Ciências Exatas e Informática
-
-Pontifícia Universidade Católica de Minas Gerais (PUC Minas)
-
-Belo Horizonte, MG, Brasil
+TCC de Graduação pelo Instituto de Ciências Exatas e Informática. Pontifícia Universidade Católica de Minas Gerais (PUC Minas). Belo Horizonte, MG, Brasil
