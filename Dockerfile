@@ -49,6 +49,6 @@ RUN pip install .
 # Expose any port if your application serves over HTTP (not required here)
 # EXPOSE 8000
 
-# By default, run the CLI. The entrypoint is the 'pitch-eval' console script
-ENTRYPOINT ["pitch-eval"]
+# By default, run the CLI. The entrypoint is the 'mopaqdaps' console script
+ENTRYPOINT ["mopaqdaps"]
 CMD ["--help"]
