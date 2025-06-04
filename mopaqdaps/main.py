@@ -1,5 +1,3 @@
-# pitch_eval/main.py
-
 import os
 import json
 import argparse
@@ -45,26 +43,21 @@ def analytical_metrics(audio, sr):
       - Number of Sinusoidal Peaks (via spectrogram peaks)
     """
     zcr = np.mean(librosa.feature.zero_crossing_rate(audio))
-    energy = np.sum(audio ** 2)
+    energy = np.sum(audio**2)
     sfm = np.mean(librosa.feature.spectral_flatness(y=audio))
 
     harmonic, _ = librosa.effects.hpss(audio)
     tonality = np.mean(np.abs(harmonic))
 
-    # here 'Harmonic Ratio' is approximated by mean(YIN) — whatever your original intent was
-    try:
-        yin_f0 = librosa.yin(audio, fmin=librosa.note_to_hz('C0'), fmax=librosa.note_to_hz('C5'))
-        harmonic_ratio = np.nanmean(yin_f0)
-    except Exception:
-        harmonic_ratio = 0.0
+    harmonic_ratio = np.mean(librosa.yin(audio, fmin=librosa.note_to_hz('C0'), fmax=librosa.note_to_hz('C5')))
 
     centroid = np.mean(librosa.feature.spectral_centroid(y=audio, sr=sr))
 
-    freqs = np.abs(np.diff(librosa.feature.spectral_centroid(y=audio, sr=sr)))
-    mafd = np.mean(freqs)
+    frequencies = np.abs(np.diff(librosa.feature.spectral_centroid(y=audio, sr=sr)))
+    mafd = np.mean(frequencies)
 
-    f, t, Sxx = scipy.signal.spectrogram(audio, sr)
-    peaks = scipy.signal.find_peaks(np.mean(Sxx, axis=1))[0]
+    frequencies, times, spectrogram = scipy.signal.spectrogram(audio, sr)
+    peaks = scipy.signal.find_peaks(np.mean(spectrogram,axis=1))[0]
 
     return {
         'Zero Crossing Rate': zcr,
@@ -88,18 +81,21 @@ def comparative_metrics(a1, a2, sr, device=None):
       - Drift Compensation (mean phase‐difference scaled)
       - Phase Reset Distance (counts of phase resets)
     """
-    # Initialize static transforms on first call (or if sr/device changes)
+    # initialize and cache on first call (or if sr/device changes)
     if not hasattr(comparative_metrics, 'initialized') \
        or comparative_metrics.sr != sr \
        or (device and comparative_metrics.device != device):
+        # set device
         dev = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         comparative_metrics.device = dev
         comparative_metrics.sr = sr
+        # MFCC transform
         comparative_metrics.mfcc_tf = torchaudio.transforms.MFCC(
             sample_rate=sr,
             n_mfcc=20,
             melkwargs={"n_fft": 2048, "hop_length": 512, "n_mels": 128, "window_fn": torch.hann_window}
         ).to(dev)
+        # STFT window
         comparative_metrics.window = torch.hann_window(2048, device=dev)
         comparative_metrics.initialized = True
 
@@ -107,15 +103,15 @@ def comparative_metrics(a1, a2, sr, device=None):
     mfcc_tf = comparative_metrics.mfcc_tf
     window = comparative_metrics.window
 
-    # Convert to torch tensors
+    # to tensor
     t1 = torch.as_tensor(a1, dtype=torch.float32, device=dev)
     t2 = torch.as_tensor(a2, dtype=torch.float32, device=dev)
 
-    # Truncate to the shorter length
+    # align length
     n = min(t1.numel(), t2.numel())
     t1, t2 = t1[:n], t2[:n]
 
-    # STFT for RMS & phase
+    # batched STFT for RMS & phase
     batch = torch.stack([t1, t2], dim=0)
     st = torch.stft(
         batch,
@@ -125,32 +121,30 @@ def comparative_metrics(a1, a2, sr, device=None):
         return_complex=True,
         center=True,
         pad_mode='reflect'
-    )  # shape: (2, freq_bins, frames)
-
+    )  # shape (2, freq, frames)
     mag2 = st.abs() ** 2
+    # frame‑wise RMS
     rms = torch.sqrt(mag2.mean(dim=1))  # (2, frames)
+    # phase
     phase = torch.angle(st)
 
     # MFCC (batch)
-    mf = mfcc_tf(batch.unsqueeze(1))  # shape: (2, n_mfcc, frames)
+    mf = mfcc_tf(batch.unsqueeze(1))  # (2, n_mfcc, frames)
     m = mf.shape[-1]
-    mfcc_dist = float((mf[0, :, :m] - mf[1, :, :m]).abs().mean().item())
+    mfcc_dist = float((mf[0,:,:m] - mf[1,:,:m]).abs().mean().item())
 
-    # Loudness distance (mean |RMS1 − RMS2|)
+    # loudness distance
     loud_dist = float((rms[0] - rms[1]).abs().mean().item())
 
-    # Detuning via PYIN on CPU
+    # detune: CPU fallback
     x1 = t1.detach().cpu().numpy()
     x2 = t2.detach().cpu().numpy()
-    try:
-        p1, _, _ = librosa.pyin(x1, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
-        p2, _, _ = librosa.pyin(x2, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
-        m3 = min(len(p1), len(p2))
-        detune = np.nanmean(np.abs(p1[:m3] - p2[:m3]))
-    except Exception:
-        detune = 0.0
+    p1, _, _ = librosa.pyin(x1, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
+    p2, _, _ = librosa.pyin(x2, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C7'))
+    m3 = min(len(p1), len(p2))
+    detune = np.nanmean(np.abs(p1[:m3] - p2[:m3]))
 
-    # Cross‐correlation (full)
+    # cross‑correlation via FFT (full mode)
     L = x1.size + x2.size - 1
     fsize = 1 << math.ceil(math.log2(L))
     A = torch.fft.rfft(t1, n=fsize)
@@ -158,33 +152,29 @@ def comparative_metrics(a1, a2, sr, device=None):
     cc = torch.fft.irfft(A * torch.conj(B), n=fsize)
     cc_max = float(cc.abs().max().item())
 
-    # Phase drift
+    # phase drift
     ph1, ph2 = phase[0], phase[1]
     mf2 = min(ph1.shape[1], ph2.shape[1])
-    drift = float((ph1[:, :mf2] - ph2[:, :mf2]).abs().mean().item())
-    drift = drift * ph1.numel() / ph1.shape[1]
+    drift = float((ph1[:,:mf2] - ph2[:,:mf2]).abs().mean().item())
+    drift = drift * ph1.numel() / ph1.shape[1] #drift / (ph1.numel())
 
-    # Phase reset distance: count where instantaneous phase jumps > threshold
+    # phase reset distance
     def resets(sig):
         ana = scipy.signal.hilbert(sig)
         ip = np.unwrap(np.angle(ana))
-        return np.where(np.diff(ip) > 0.1)[0]
-
+        return np.where(np.diff(ip) > 0.1)[0] #np.where(np.diff(ip) > np.pi)[0]
     r1 = resets(x1)
     r2 = resets(x2)
-    if len(r1) == 0 or len(r2) == 0:
-        pr_dist = 0.0
-    else:
-        mlen = min(len(r1), len(r2))
-        pr_dist = float(np.mean(np.abs(r1[:mlen] - r2[:mlen])))
+    mr = abs(len(r1) - len(r2))>1 #min(len(r1), len(r2))
+    pr_dist = float(np.mean(np.abs(r1[:mr] - r2[:mr]))) if mr > 0 else 0.0
 
     return {
-        'MFCC L1 Distance': mfcc_dist,
-        'Loudness Distance': loud_dist,
-        'Detuning': detune,
+        'MFCC L1 Distance':      mfcc_dist,
+        'Loudness Distance':     loud_dist,
+        'Detuning':              detune,
         'Cross-Correlation Max': cc_max,
-        'Drift Compensation': drift,
-        'Phase Reset Distance': pr_dist
+        'Drift Compensation':    drift,
+        'Phase Reset Distance':  pr_dist
     }
 
 
