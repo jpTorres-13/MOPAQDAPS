@@ -289,23 +289,23 @@ Para executar via Docker, siga os passos abaixo:
 
    ```bash
    docker run --rm \
-     -v /path/to/your/data_in:/data:ro \
-     -v /path/to/local/data_out:/out \
+     -v ./MOPAQDAPS/data_in:/data_in:ro \
+     -v ./MOPAQDAPS/data_out:/data_out \
      mopaqdaps \
      --dataset_root /data_in \
      --results_root /data_out
    ```
 
-   * `-v /path/to/your/data_in:/data_in:ro` monta o seu diretório local de dataset (contendo `input/` e `output/`) como `/data_in` dentro do container (read-only).
-   * `-v /path/to/local/data_out:/data_out` monta o seu diretório local de saída como `/data_out` dentros do container (read/write).
+   * `-v ./MOPAQDAPS/data_in:/data_in:ro` monta o seu diretório local de dataset (contendo `input/` e `output/`) como `/data_in` dentro do container (read-only).
+   * `-v ./MOPAQDAPS/data_out:/data_out` monta o seu diretório local de saída como `/data_out` dentros do container (read/write).
    * O comando `mopaqdaps --dataset_root /data_in --results_root /data_out` executa o MOPAQDAPS dentro do container.
 
 5. **(Opcional)** Se desejar pular a geração de espectrogramas:
 
    ```bash
    docker run --rm \
-     -v /path/to/your/data_in:/data:ro \
-     -v /path/to/local/data_out:/out \
+     -v ./MOPAQDAPS/data_in:/data_in:ro \
+     -v ./MOPAQDAPS/data_out:/data_out \
      mopaqdaps \
      --dataset_root /data_in \
      --results_root /data_out \
